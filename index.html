@@ -1,335 +1,481 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jadwal Kuliah & Ruangan</title>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<style>
-  :root {
-    --primary-color: #00bcd4;
-    --bg-dark: #121212;
-    --bg-light: #1e1e1e;
-    --text-light: #e0e0e0;
-    --text-dark: #121212;
-    --border-color: #333;
-    --table-radius: 10px;
-  }
-  body {
-    margin: 0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: var(--bg-dark);
-    color: var(--text-light);
-  }
-
-  /* Header */
-  header {
-    width: 100%;
-    background: var(--bg-light);
-    padding: 15px 25px;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.3);
-    position: relative;
-  }
-  header h1 {
-    margin: 0;
-    font-size: 22px;
-    color: var(--primary-color);
-    z-index: 2;
-  }
-  #clock {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 28px;
-    font-weight: bold;
-    color: var(--primary-color);
-    font-family: 'Courier New', monospace;
-    z-index: 1;
-  }
-
-  /* Sidebar */
-  .sidebar {
-    width: 220px;
-    height: calc(100vh - 63px);
-    background: var(--bg-light);
-    float: left;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.5);
-  }
-  .sidebar button {
-    padding: 18px;
-    border: none;
-    background: var(--bg-light);
-    color: var(--primary-color);
-    cursor: pointer;
-    font-size: 16px;
-    text-align: left;
-    transition: all 0.3s ease;
-    border-left: 5px solid transparent;
-  }
-  .sidebar button:hover {
-    background: #2a2a2a;
-    border-left: 5px solid var(--primary-color);
-  }
-
-  /* Content */
-  .content {
-    margin-left: 220px;
-    padding: 25px;
-    margin-top: 63px;
-  }
-  h2 {
-    color: var(--primary-color);
-    margin-bottom: 15px;
-  }
-
-  /* Tables */
-  table {
-    border-collapse: collapse;
-    width: 100%;
-    margin-top: 10px;
-    background: var(--bg-light);
-    border-radius: var(--table-radius);
-    overflow: hidden;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-  }
-  th, td {
-    border: 1px solid var(--border-color);
-    padding: 12px;
-    text-align: center;
-  }
-  th {
-    background: var(--primary-color);
-    color: var(--text-dark);
-  }
-  td {
-    color: var(--text-light);
-  }
-
-  /* Inputs & Buttons */
-  input, button {
-    padding: 8px 12px;
-    margin: 6px 0;
-    border-radius: 6px;
-    border: none;
-    font-size: 14px;
-  }
-  input {
-    width: 100%;
-    max-width: 320px;
-  }
-  button {
-    background: var(--primary-color);
-    color: var(--text-dark);
-    cursor: pointer;
-    transition: 0.3s;
-  }
-  button:hover {
-    background: #26c6da;
-  }
-
-  .hidden { display: none; }
-
-  /* Responsive */
-  @media (max-width: 700px) {
-    .sidebar {
-      width: 100%;
-      height: auto;
-      flex-direction: row;
-      overflow-x: auto;
-    }
-    .sidebar button {
-      flex: 1;
-      font-size: 14px;
-      text-align: center;
-      border-left: none;
-      border-bottom: 3px solid transparent;
-    }
-    .sidebar button:hover { border-bottom: 3px solid var(--primary-color); }
-    .content { margin-left: 0; padding: 15px; }
-    table { font-size: 12px; }
-    header { flex-direction: column; align-items: flex-start; gap: 8px; position: relative; }
-    #clock { position: relative; left: 0; transform: none; font-size: 24px; margin-top: 5px;}
-  }
-</style>
-</head>
-<body>
-
-<header>
-  <h1>Jadwal Kuliah</h1>
-  <div id="clock">00:00:00</div>
-</header>
-
-<div class="sidebar">
-  <button onclick="showPage('hariIni')">Hari Ini</button>
-  <button onclick="showPage('jadwal')">Jadwal</button>
-  <button onclick="showPage('ruangan')">Ruangan</button>
-  <button onclick="showPage('upload')">Upload</button>
-</div>
-
-<div class="content">
-  <div id="hariIni" class="page">
-    <h2>Jadwal & Ruangan Hari Ini</h2>
-    <table id="todayTable">
-      <thead><tr><th>Jam</th><th>Mata Kuliah</th><th>Ruangan</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <div id="jadwal" class="page hidden">
-    <h2>Semua Jadwal</h2>
-    <table id="jadwalTable">
-      <thead><tr><th>Mata Kuliah</th><th>Hari</th><th>Jam Mulai</th><th>Jam Selesai</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <div id="ruangan" class="page hidden">
-    <h2>Semua Ruangan</h2>
-    <table id="ruanganTable">
-      <thead><tr><th>Ruangan</th><th>Hari</th><th>Jam Mulai</th><th>Jam Selesai</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <div id="upload" class="page hidden">
-    <h2>Upload Jadwal dari Excel</h2>
-    <div>
-      <label>Materi & Jadwal: </label>
-      <input type="file" id="materiFile" accept=".xlsx,.xls">
-      <button onclick="uploadMateri()">Upload</button>
-    </div>
-    <div>
-      <label>Ruangan & Jadwal: </label>
-      <input type="file" id="ruanganFile" accept=".xlsx,.xls">
-      <button onclick="uploadRuangan()">Upload</button>
-    </div>
-    <div style="margin-top: 15px;">
-      <button style="background:red; color:white;" onclick="deleteAllData()">Hapus Semua Data</button>
-    </div>
-  </div>
-</div>
-
-<script>
-// --- Navigation ---
-function showPage(id) {
-  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
-  document.getElementById(id).classList.remove('hidden');
-}
-
-// --- Firebase ---
-const firebaseConfig = {
-  apiKey: "AIzaSyBIaqsrhd1858u8_JGDLIbI7aIFLCn2O5E",
-  authDomain: "jadwal-451a8.firebaseapp.com",
-  projectId: "jadwal-451a8",
-  storageBucket: "jadwal-451a8.firebasestorage.app",
-  messagingSenderId: "787897743797",
-  appId: "1:787897743797:web:852d274bdc071c8ef041fc"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-// --- Upload Excel ---
-function uploadMateri() {
-  const file = document.getElementById('materiFile').files[0];
-  if(!file) return alert('Pilih file Excel dulu');
-  const reader = new FileReader();
-  reader.onload = e => {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: 'array' });
-    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-    rows.forEach(row => {
-      db.ref('materi_jadwal').push({
-        mata_kuliah: row['Mata Kuliah'] || '',
-        hari: row['Hari'] || '',
-        jam_mulai: row['Jam Mulai'] || '',
-        jam_selesai: row['Jam Selesai'] || ''
-      });
-    });
-    alert('Materi & Jadwal berhasil di-upload!');
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function uploadRuangan() {
-  const file = document.getElementById('ruanganFile').files[0];
-  if(!file) return alert('Pilih file Excel dulu');
-  const reader = new FileReader();
-  reader.onload = e => {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: 'array' });
-    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-    rows.forEach(row => {
-      db.ref('ruangan_jadwal').push({
-        ruangan: row['Ruangan'] || '',
-        hari: row['Hari'] || '',
-        jam_mulai: row['Jam Mulai'] || '',
-        jam_selesai: row['Jam Selesai'] || ''
-      });
-    });
-    alert('Ruangan & Jadwal berhasil di-upload!');
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-// --- Hapus Semua Data ---
-function deleteAllData() {
-  if(confirm("Apakah Anda yakin ingin menghapus semua data?")) {
-    db.ref('materi_jadwal').remove();
-    db.ref('ruangan_jadwal').remove();
-    alert("Semua data berhasil dihapus!");
-  }
-}
-
-// --- Display Jadwal Hari Ini ---
-function updateTodayTable() {
-  const today = new Date().toLocaleDateString('id-ID', { weekday: 'long' });
-  const tbody = document.querySelector('#todayTable tbody');
-  tbody.innerHTML = '';
-  const jadwalData = {};
-  db.ref('materi_jadwal').once('value').then(snapshot => {
-    snapshot.forEach(child => {
-      const data = child.val();
-      if(data.hari.toLowerCase() === today.toLowerCase()) {
-        jadwalData[data.mata_kuliah] = { jam_mulai: data.jam_mulai, jam_selesai: data.jam_selesai };
-      }
-    });
-    db.ref('ruangan_jadwal').once('value').then(snapshot => {
-      snapshot.forEach(child => {
-        const data = child.val();
-        for(const mata in jadwalData) {
-          if(data.hari.toLowerCase() === today.toLowerCase()) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${jadwalData[mata].jam_mulai} - ${jadwalData[mata].jam_selesai}</td><td>${mata}</td><td>${data.ruangan}</td>`;
-            tbody.appendChild(tr);
-          }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jadwal Kuliah TI Putra - Ganjil 2025/2026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1f2937; /* Gray-800 */
         }
-      });
-    });
-  });
-}
+        .scroll-container {
+            /* Hide scrollbar for aesthetic purposes */
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .scroll-container::-webkit-scrollbar {
+            display: none;
+        }
+        .tab-button {
+            transition: all 0.2s;
+        }
+        .active-tab {
+            border-color: #3b82f6; /* Blue-500 */
+            color: #60a5fa; /* Blue-400 */
+            background-color: #1f2937;
+        }
+        .inactive-tab {
+            border-color: transparent;
+            color: #9ca3af;
+        }
+        .inactive-tab:hover {
+            color: #d1d5db;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
 
-// Listen for updates
-db.ref('materi_jadwal').on('value', updateTodayTable);
-db.ref('ruangan_jadwal').on('value', updateTodayTable);
+    <!-- Loading Overlay (Simple Spinner for Initial Load) -->
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-95 z-50 flex flex-col items-center justify-center">
+        <div class="animate-spin h-12 w-12 text-blue-500 border-4 border-t-4 border-t-transparent border-blue-500 rounded-full"></div>
+        <p class="mt-4 text-white text-lg font-semibold">Memuat Jadwal...</p>
+    </div>
+    
+    <!-- Main Content -->
+    <div id="main-content" class="min-h-screen bg-gray-900 p-4 sm:p-8 hidden">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-blue-400 tracking-tight">Jadwal Kuliah TI Putra</h1>
+            <p class="text-lg text-gray-400 mt-1">Semester Ganjil TA. 2025/2026</p>
+        </header>
 
-// --- Clock ---
-function updateClock() {
-  const now = new Date();
-  const h = String(now.getHours()).padStart(2,'0');
-  const m = String(now.getMinutes()).padStart(2,'0');
-  const s = String(now.getSeconds()).padStart(2,'0');
-  document.getElementById('clock').textContent = `${h}:${m}:${s}`;
-}
-setInterval(updateClock, 1000);
-updateClock();
-</script>
+        <!-- Tab Navigation -->
+        <div class="max-w-4xl mx-auto mb-6">
+            <div class="flex justify-center border-b border-gray-700 space-x-2 sm:space-x-4">
+                <button id="tab-today" onclick="showTab('today')" class="tab-button py-2 px-3 sm:px-6 text-sm sm:text-base font-medium focus:outline-none border-b-2 inactive-tab">Jadwal Hari Ini</button>
+                <button id="tab-all" onclick="showTab('all')" class="tab-button py-2 px-3 sm:px-6 text-sm sm:text-base font-medium focus:outline-none border-b-2 active-tab">Semua Jadwal</button>
+                <button id="tab-info" onclick="showTab('info')" class="tab-button py-2 px-3 sm:px-6 text-sm sm:text-base font-medium focus:outline-none border-b-2 inactive-tab">Informasi</button>
+            </div>
+        </div>
 
+        <!-- Content Sections -->
+        
+        <!-- 1. Jadwal Hari Ini (Today) -->
+        <div id="content-today" class="hidden max-w-4xl mx-auto">
+            <h2 id="today-title" class="text-2xl font-bold text-gray-200 mb-4 text-center"></h2>
+            <div id="today-schedule-container" class="space-y-4">
+                <!-- Today's schedule will be injected here -->
+            </div>
+            <div id="no-schedule-today" class="hidden mt-8">
+                <div class="bg-green-800 border-l-4 border-green-400 text-green-200 p-4 rounded-lg shadow-md max-w-lg mx-auto" role="alert">
+                    <p class="font-bold">Selamat!</p>
+                    <p>Tidak ada jadwal kuliah hari ini. Saatnya istirahat atau fokus tugas.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Semua Jadwal (All) -->
+        <div id="content-all" class="max-w-4xl mx-auto">
+            <div class="mb-6 flex justify-end items-center">
+                <label for="semester-select" class="text-gray-400 font-medium mr-3">Filter Semester:</label>
+                <select id="semester-select" class="p-2 border border-gray-700 bg-gray-700 text-gray-200 rounded-lg shadow-md focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+                    <option value="all">Semua Semester</option>
+                    <option value="I">Semester I</option>
+                    <option value="III">Semester III</option>
+                    <option value="V">Semester V</option>
+                    <option value="VII">Semester VII</option>
+                </select>
+            </div>
+            
+            <div id="schedule-container" class="space-y-8">
+                <!-- All schedules will be injected here -->
+            </div>
+        </div>
+
+        <!-- 3. Informasi (Info) -->
+        <div id="content-info" class="hidden max-w-4xl mx-auto p-4 bg-gray-800 rounded-xl shadow-xl border border-gray-700">
+            <h2 class="text-2xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-2">Informasi Penting</h2>
+            
+            <!-- Jam Perkuliahan -->
+            <div class="mb-8">
+                <h3 class="text-xl font-semibold text-gray-200 mb-3">Ketentuan Jam Perkuliahan (WIB)</h3>
+                <div id="time-slots" class="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                    <!-- Time slots injected by JS -->
+                </div>
+            </div>
+
+            <!-- Detail Ruangan -->
+            <div class="mb-8">
+                <h3 class="text-xl font-semibold text-gray-200 mb-3">Detail Ruang Kelas</h3>
+                <div id="ruang-list" class="space-y-2">
+                    <!-- Ruang details injected by JS -->
+                </div>
+            </div>
+
+            <!-- Detail Dosen -->
+            <div class="mb-8">
+                <h3 class="text-xl font-semibold text-gray-200 mb-3">Daftar Dosen Pengampu</h3>
+                <div id="dosen-list" class="space-y-2">
+                    <!-- Dosen details injected by JS -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Detail Modals -->
+        <div id="modal-dosen" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden items-center justify-center p-4">
+            <div class="bg-gray-800 text-gray-100 rounded-xl shadow-2xl p-6 w-full max-w-sm transform transition-all duration-300 scale-100 border border-gray-700">
+                <h3 class="text-xl font-bold text-blue-400 mb-4">Detail Dosen</h3>
+                <div id="dosen-content" class="text-gray-300"></div>
+                <button onclick="closeModal('modal-dosen')" class="mt-6 w-full py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150 shadow-md">Tutup</button>
+            </div>
+        </div>
+
+        <div id="modal-ruang" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden items-center justify-center p-4">
+            <div class="bg-gray-800 text-gray-100 rounded-xl shadow-2xl p-6 w-full max-w-sm transform transition-all duration-300 scale-100 border border-gray-700">
+                <h3 class="text-xl font-bold text-blue-400 mb-4">Detail Ruang Kuliah</h3>
+                <div id="ruang-content" class="text-gray-300"></div>
+                <button onclick="closeModal('modal-ruang')" class="mt-6 w-full py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150 shadow-md">Tutup</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Static Data (No Local Storage or Editing) ---
+        const schedules = [
+            // Data Jadwal TI Putra
+            { id: 'c1', semester: 'I A', hari: 'Selasa', jam: '1, 2, 3, 4', mk: 'Dasar Pemrograman', ruang: 'ICT 1', kd: '21' },
+            { id: 'c2', semester: 'I A', hari: 'Selasa', jam: '8, 9, 10', mk: 'Kalkulus', ruang: 'RU.05', kd: '102' },
+            { id: 'c3', semester: 'I A', hari: 'Rabu', jam: '6, 7', mk: 'Agama Islam', ruang: 'RU.12', kd: '125' },
+            // Jadwal yang diubah: Bahasa Inggris I A dipindah ke Ahad jam 9
+            { id: 'c4', semester: 'I A', hari: 'Ahad', jam: '9', mk: 'Bahasa Inggris', ruang: 'RU.06', kd: '131' },
+            { id: 'c5', semester: 'I A', hari: 'Kamis', jam: '5, 6, 7', mk: 'Statistika', ruang: 'RU.12', kd: '123' },
+            { id: 'c6', semester: 'I A', hari: 'Kamis', jam: '8, 9', mk: 'Bahasa Indonesia', ruang: 'RU.09', kd: '158' },
+            { id: 'c7', semester: 'I B', hari: 'Senin', jam: '1-10', mk: 'Pemrograman Berorientasi Objek', ruang: 'ICT 1', kd: '53' },
+            { id: 'c8', semester: 'I B', hari: 'Selasa', jam: '3, 4, 5, 6', mk: 'Pengantar TI', ruang: 'RU.06', kd: '52' },
+            { id: 'c9', semester: 'I B', hari: 'Selasa', jam: '7, 8', mk: 'Dasar Pemrograman', ruang: 'ICT 1', kd: '21' },
+            { id: 'c10', semester: 'I B', hari: 'Rabu', jam: '3, 4, 5', mk: 'Kalkulus', ruang: 'RU.05', kd: '102' },
+            { id: 'c11', semester: 'I B', hari: 'Rabu', jam: '6, 7, 8, 9', mk: 'Dasar Infrastruktur TI', ruang: 'RU.05', kd: '124' },
+            { id: 'c12', semester: 'I B', hari: 'Kamis', jam: '5', mk: 'Bahasa Inggris', ruang: 'RU.06', kd: '131' },
+            { id: 'c13', semester: 'I B', hari: 'Kamis', jam: '6, 7', mk: 'Bahasa Indonesia', ruang: 'RU.09', kd: '158' },
+            { id: 'c14', semester: 'I B', hari: 'Kamis', jam: '8, 9, 10', mk: 'Statistika', ruang: 'RU.12', kd: '123' },
+            { id: 'c15', semester: 'III A', hari: 'Sabtu', jam: '5, 6, 7, 8, 9', mk: 'Manajemen Sistem Informasi', ruang: 'RU.05', kd: '59' },
+            { id: 'c16', semester: 'III A', hari: 'Ahad', jam: '5, 6, 7, 8, 9', mk: 'Rekayasa Perangkat Lunak', ruang: 'ICT 2', kd: '21' },
+            { id: 'c17', semester: 'III A', hari: 'Senin', jam: '4, 5, 6, 7, 8, 9', mk: 'Komunikasi Data', ruang: 'RU.05', kd: '52' },
+            { id: 'c18', semester: 'III A', hari: 'Rabu', jam: '1, 2, 3, 4, 5, 6', mk: 'Pemrograman Sistem dan Jaringan', ruang: 'ICT 1', kd: '120' },
+            { id: 'c19', semester: 'III A', hari: 'Rabu', jam: '7, 8, 9', mk: 'Pengantar Basis Data', ruang: 'ICT 1', kd: '53' },
+            { id: 'c20', semester: 'III A', hari: 'Kamis', jam: '5, 6, 7', mk: 'Pengantar Basis Data', ruang: 'ICT 1', kd: '53' },
+            { id: 'c21', semester: 'III A', hari: 'Kamis', jam: '8, 9, 10', mk: 'Rekayasa Perangkat Lunak', ruang: 'ICT 1', kd: '21' },
+            { id: 'c22', semester: 'III B', hari: 'Sabtu', jam: '1, 2, 3, 4, 5, 6', mk: 'Desain dan Analisis Sistem', ruang: 'RU.06', kd: '120' },
+            { id: 'c23', semester: 'III B', hari: 'Senin', jam: '3, 4, 5, 6, 7, 8, 9, 10', mk: 'Pemrograman Berorientasi Objek', ruang: 'ICT 1', kd: '53' },
+            { id: 'c24', semester: 'III B', hari: 'Rabu', jam: '8, 9', mk: 'Agama Islam', ruang: 'RU.12', kd: '125' },
+            { id: 'c25', semester: 'V A', hari: 'Sabtu', jam: '2, 3, 4', mk: 'Manajemen Proyek TI', ruang: 'RU.12', kd: '124' },
+            { id: 'c26', semester: 'V A', hari: 'Sabtu', jam: '5, 6, 7', mk: 'Sistem Keamanan Jaringan', ruang: 'ICT 1', kd: '178' },
+            { id: 'c27', semester: 'V A', hari: 'Senin', jam: '4, 5, 6', mk: 'Manajemen Proyek TI', ruang: 'RU.12', kd: '124' },
+            { id: 'c28', semester: 'V A', hari: 'Selasa', jam: '4, 5, 6', mk: 'Pengolahan Citra Digital', ruang: 'ICT 3', kd: '48' },
+            { id: 'c29', semester: 'V A', hari: 'Rabu', jam: '3, 4, 5', mk: 'Data Mining', ruang: 'RU.12', kd: '124' },
+            { id: 'c30', semester: 'V A', hari: 'Kamis', jam: '2, 3, 4', mk: 'Internet of Things', ruang: 'RU.05', kd: '174' },
+            { id: 'c31', semester: 'V B', hari: 'Sabtu', jam: '2, 3, 4', mk: 'Sistem Keamanan Jaringan', ruang: 'ICT 1', kd: '178' },
+            { id: 'c32', semester: 'V B', hari: 'Sabtu', jam: '5, 6', mk: 'Integrasi Islam dan Sains', ruang: 'RU.12', kd: '175' },
+            { id: 'c33', semester: 'V B', hari: 'Senin', jam: '1, 2, 3', mk: 'Pengolahan Citra Digital', ruang: 'RU.06', kd: '21' },
+            { id: 'c34', semester: 'V B', hari: 'Selasa', jam: '2, 3, 4, 5, 6', mk: 'Pemrograman Web Lanjut', ruang: 'ICT 2', kd: '53' },
+            { id: 'c35', semester: 'V B', hari: 'Selasa', jam: '7, 8, 9', mk: 'Data Mining', ruang: 'RU.06', kd: '124' },
+            { id: 'c36', semester: 'V B', hari: 'Kamis', jam: '8, 9, 10', mk: 'Internet of Things', ruang: 'RU.05', kd: '174' },
+            { id: 'c37', semester: 'V C', hari: 'Sabtu', jam: '8, 9, 10', mk: 'Sistem Keamanan Jaringan', ruang: 'ICT 1', kd: '178' },
+            { id: 'c38', semester: 'V C', hari: 'Senin', jam: '7, 8', mk: 'Integrasi Islam dan Sains', ruang: 'RU.06', kd: '175' },
+            { id: 'c39', semester: 'V C', hari: 'Selasa', jam: '7, 8, 9, 10', mk: 'Pemrograman Web Lanjut', ruang: 'ICT 2', kd: '53' },
+            { id: 'c40', semester: 'V C', hari: 'Rabu', jam: '6, 7', mk: 'Sistem Temu Kembali Informasi', ruang: 'RU.06', kd: '52' },
+            { id: 'c41', semester: 'V C', hari: 'Rabu', jam: '8, 9', mk: 'Sistem Temu Kembali Informasi', ruang: 'RU.06', kd: '52' },
+            { id: 'c42', semester: 'V C', hari: 'Kamis', jam: '5, 6, 7', mk: 'Internet of Things', ruang: 'RU.05', kd: '174' },
+            { id: 'c43', semester: 'VII A', hari: 'Ahad', jam: '3, 4, 5, 6, 7', mk: 'Kewarganegaraan', ruang: 'RU.06', kd: '126' },
+            { id: 'c44', semester: 'VII A', hari: 'Senin', jam: '1, 2, 3, 4, 5, 6, 7, 8', mk: 'Pemrograman Perangkat Bergerak Lanjut', ruang: 'ICT 2', kd: '120' },
+            { id: 'c45', semester: 'VII A', hari: 'Rabu', jam: '5, 6', mk: 'Akhlak Tasawuf', ruang: 'RU.09', kd: '100' },
+            { id: 'c46', semester: 'VII B', hari: 'Ahad', jam: '1, 2, 3, 4', mk: 'Pemrograman Perangkat Bergerak Lanjut', ruang: 'ICT 2', kd: '120' },
+            { id: 'c47', semester: 'VII B', hari: 'Ahad', jam: '8, 9', mk: 'Kewarganegaraan', ruang: 'RU.06', kd: '126' },
+            { id: 'c48', semester: 'VII B', hari: 'Rabu', jam: '7, 8', mk: 'Akhlak Tasawuf', ruang: 'RU.09', kd: '100' },
+            { id: 'c49', semester: 'VII C', hari: 'Ahad', jam: '5, 6, 7, 8, 9, 10', mk: 'Kewarganegaraan', ruang: 'RU.06', kd: '126' },
+            { id: 'c50', semester: 'VII C', hari: 'Rabu', jam: '9, 10', mk: 'Akhlak Tasawuf', ruang: 'RU.09', kd: '100' },
+        ];
+        
+        const dosenData = {
+            '21': 'Suhartono, M.T.I.', '102': 'Ach. Hasan Basyori, M.Pd.', '125': 'Syaiful Bahri, Lc., M.A.', '131': 'Moh. Makki, M.A.',
+            '123': 'Dr. H. Abd. Rauf, M.Si.', '158': 'Moh. Qosim, M.Pd.', '53': 'Saiful Rizal, M.T.', '52': 'Abdul Kholik, M.T.',
+            '124': 'Ahmad Junaidi, M.Kom.', '59': 'Hj. Sulisni, M.Kom.', '120': 'Ahmad Izzat, S.Kom., M.Kom.', '178': 'Nur Afifah, S.ST., M.Kom.',
+            '48': 'Moh. Nurus Shomad, M.Kom.', '174': 'Moh. Shofyan, M.Kom.', '175': 'Moh. Syaifuddin, S.H.I., M.Pd.I.', '126': 'Moh. Hosen, M.Pd.',
+            '100': 'Mahrus, M.Ud.',
+        };
+
+        const ruangData = {
+            'ICT 1': 'Laboratorium ICT 1 (Gedung KIA IDRIS, Lantai dasar bagian utara)',
+            'RU.05': 'Ruang Kuliah Umum No. 5 (Asumsi: di Gedung Rektorat atau Fakultas)',
+            'RU.12': 'Ruang Kuliah Umum No. 12 (Asumsi: di Gedung Rektorat atau Fakultas)',
+            'RU.06': 'Ruang Kuliah Umum No. 6 (Asumsi: di Gedung Rektorat atau Fakultas)',
+            'RU.09': 'Ruang Kuliah Umum No. 9 (Asumsi: di Gedung Rektorat atau Fakultas)',
+            'ICT 2': 'Laboratorium ICT 2 (Gedung Fakultas, lantai 2)',
+            'ICT 3': 'Laboratorium ICT 3 (Gedung Rektorat Universitas Annuqayah, Lt. 2 paling utara)',
+        };
+
+        const timeSlots = [
+            { jam: 1, waktu: '07.30 – 08.20' }, { jam: 2, waktu: '08.20 – 09.10' },
+            { jam: 3, waktu: '09.15 – 10.05' }, { jam: 4, waktu: '10.05 – 10.55' },
+            { jam: 5, waktu: '11.00 – 11.50' }, { jam: 6, waktu: '11.50 – 12.40' },
+            { jam: 7, waktu: '13.15 – 14.05' }, { jam: 8, waktu: '14.05 – 14.55' },
+            { jam: 9, waktu: '14.55 – 15.45' }, { jam: 10, waktu: '15.45 – 16.35' }
+        ];
+
+        // Dark Mode Color mapping for cards
+        const darkColors = {
+            'I': { bg: 'bg-green-900', border: 'border-green-400', text: 'text-green-300', rowBg: 'bg-gray-800', hoverBg: 'hover:bg-gray-700' },
+            'III': { bg: 'bg-yellow-900', border: 'border-yellow-400', text: 'text-yellow-300', rowBg: 'bg-gray-800', hoverBg: 'hover:bg-gray-700' },
+            'V': { bg: 'bg-red-900', border: 'border-red-400', text: 'text-red-300', rowBg: 'bg-gray-800', hoverBg: 'hover:bg-gray-700' },
+            'VII': { bg: 'bg-indigo-900', border: 'border-indigo-400', text: 'text-indigo-300', rowBg: 'bg-gray-800', hoverBg: 'hover:bg-gray-700' },
+        };
+
+        // --- Utility Functions ---
+
+        function getTodayName() {
+            const days = ['Ahad', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const dayIndex = new Date().getDay();
+            return days[dayIndex];
+        }
+
+        window.openModal = function(type, code) {
+            let contentDiv, modalId;
+            let title = '';
+            let details = '';
+
+            if (type === 'dosen') {
+                contentDiv = document.getElementById('dosen-content');
+                modalId = 'modal-dosen';
+                title = dosenData[code] || 'Nama tidak ditemukan';
+                details = `Kode Dosen: <span class="font-bold text-blue-300">${code}</span>`;
+            } else if (type === 'ruang') {
+                contentDiv = document.getElementById('ruang-content');
+                modalId = 'modal-ruang';
+                title = code;
+                details = ruangData[code] || 'Lokasi tidak ditemukan. Asumsi ruang umum.';
+            } else {
+                return;
+            }
+
+            contentDiv.innerHTML = `<p class="text-xl font-semibold mb-2 text-gray-100">${title}</p><p class="text-sm text-gray-400">${details}</p>`;
+            document.getElementById(modalId).classList.remove('hidden');
+            document.getElementById(modalId).classList.add('flex');
+        }
+
+        window.closeModal = function(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+            document.getElementById(modalId).classList.remove('flex');
+        }
+
+        window.showTab = function(tabName) {
+            // Hide all content sections
+            document.getElementById('content-today').classList.add('hidden');
+            document.getElementById('content-all').classList.add('hidden');
+            document.getElementById('content-info').classList.add('hidden');
+
+            // Deactivate all tab buttons
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active-tab');
+                button.classList.add('inactive-tab');
+            });
+
+            // Show the selected content section and activate the corresponding tab button
+            document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabName}`).classList.remove('inactive-tab');
+            document.getElementById(`tab-${tabName}`).classList.add('active-tab');
+            
+            // Perform rendering based on the tab
+            if (tabName === 'today') {
+                renderTodaySchedule();
+            } else if (tabName === 'all') {
+                // Ensure filter is applied when switching to 'all' tab
+                renderSchedule(document.getElementById('semester-select').value);
+            } else if (tabName === 'info') {
+                renderInfoSection();
+            }
+        }
+
+        function renderSchedule(filterSemester = 'all') {
+            const container = document.getElementById('schedule-container');
+            container.innerHTML = '';
+            
+            const grouped = schedules.reduce((acc, current) => {
+                const mainSem = current.semester.split(' ')[0]; 
+                
+                if (filterSemester !== 'all' && mainSem !== filterSemester) {
+                    return acc;
+                }
+
+                if (!acc[current.semester]) {
+                    acc[current.semester] = [];
+                }
+                acc[current.semester].push(current);
+                return acc;
+            }, {});
+
+            if (Object.keys(grouped).length === 0) {
+                container.innerHTML = `
+                    <div class="bg-yellow-800 border-l-4 border-yellow-400 text-yellow-200 p-4 rounded-lg shadow-md max-w-lg mx-auto" role="alert">
+                        <p class="font-bold">Tidak ada data</p>
+                        <p>Tidak ada jadwal yang cocok untuk filter semester ini.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            for (const semClass in grouped) {
+                const semSchedules = grouped[semClass];
+                const semMain = semClass.split(' ')[0];
+                const color = darkColors[semMain] || { bg: 'bg-gray-700', border: 'border-blue-400', text: 'text-blue-300', rowBg: 'bg-gray-800', hoverBg: 'hover:bg-gray-700' };
+
+                let html = `
+                    <div class="${color.bg} border-l-8 ${color.border} rounded-xl shadow-lg p-3 sm:p-6">
+                        <h2 class="text-2xl font-bold ${color.text} mb-4">Semester ${semClass}</h2>
+                        
+                        <div class="overflow-x-auto scroll-container">
+                            <table class="min-w-full divide-y divide-gray-700">
+                                <thead class="bg-gray-700/50">
+                                    <tr>
+                                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider w-1/12">Hari</th>
+                                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider w-1/12">Jam</th>
+                                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider w-5/12">Mata Kuliah</th>
+                                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider w-2/12">Dosen (KD)</th>
+                                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider w-3/12">Ruang</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-700">
+                `;
+
+                semSchedules.forEach(data => {
+                    const dosenName = dosenData[data.kd] || 'N/A';
+                    const isLongHours = data.jam.includes('-');
+
+                    html += `
+                        <tr class="${color.rowBg} ${color.hoverBg} transition duration-100 ${isLongHours ? 'bg-indigo-900/40' : ''}">
+                            <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-100">${data.hari}</td>
+                            <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-400">${data.jam}</td>
+                            <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-200 font-medium">${data.mk}</td>
+                            <td class="px-3 py-3 whitespace-nowrap text-sm">
+                                <button onclick="openModal('dosen', '${data.kd}')" class="text-blue-400 hover:text-blue-300 font-semibold underline transition duration-150 text-left">
+                                    ${dosenData[data.kd] || 'N/A'} <span class="text-xs text-gray-500">(${data.kd})</span>
+                                </button>
+                            </td>
+                            <td class="px-3 py-3 whitespace-nowrap text-sm">
+                                <button onclick="openModal('ruang', '${data.ruang}')" class="text-blue-400 hover:text-blue-300 font-semibold underline transition duration-150 text-left">
+                                    ${data.ruang}
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += html;
+            }
+        }
+        
+        function renderTodaySchedule() {
+            const todayName = getTodayName();
+            const todaySchedules = schedules.filter(s => s.hari === todayName);
+
+            const container = document.getElementById('today-schedule-container');
+            
+            document.getElementById('today-title').textContent = `Jadwal Kuliah Hari ${todayName}`;
+
+            container.innerHTML = '';
+            document.getElementById('no-schedule-today').classList.add('hidden');
+
+            if (todaySchedules.length === 0) {
+                document.getElementById('no-schedule-today').classList.remove('hidden');
+                return;
+            }
+
+            // Group by semester for today's view
+            const groupedToday = todaySchedules.reduce((acc, current) => {
+                if (!acc[current.semester]) {
+                    acc[current.semester] = [];
+                }
+                acc[current.semester].push(current);
+                return acc;
+            }, {});
+
+            for (const semClass in groupedToday) {
+                const semMain = semClass.split(' ')[0];
+                const color = darkColors[semMain] || darkColors['I'];
+                let semHtml = `<div class="${color.bg} border-l-4 ${color.border} rounded-xl shadow-md p-4">
+                                <h4 class="text-lg font-bold ${color.text} mb-2">Semester ${semClass}</h4>
+                                <ul class="space-y-2">`;
+                
+                groupedToday[semClass].forEach(data => {
+                    const dosenName = dosenData[data.kd] || 'N/A';
+                    semHtml += `<li class="border-b border-gray-700 pb-1 text-gray-300">
+                                    <span class="font-semibold text-blue-400">${data.jam}</span>: ${data.mk}
+                                    <span class="text-sm text-gray-400">(${data.ruang} - ${dosenName})</span>
+                                </li>`;
+                });
+
+                semHtml += `</ul></div>`;
+                container.innerHTML += semHtml;
+            }
+        }
+
+        function renderInfoSection() {
+            // 1. Time Slots
+            const timeContainer = document.getElementById('time-slots');
+            timeContainer.innerHTML = timeSlots.map(slot => `
+                <div class="bg-gray-700 p-3 rounded-lg shadow-inner">
+                    <p class="font-bold text-lg text-blue-400">Jam ${slot.jam}</p>
+                    <p class="text-sm text-gray-300">${slot.waktu}</p>
+                </div>
+            `).join('');
+
+            // 2. Ruang List
+            const ruangContainer = document.getElementById('ruang-list');
+            const sortedRuang = Object.entries(ruangData).sort();
+
+            ruangContainer.innerHTML = sortedRuang.map(([kode, keterangan]) => `
+                <div class="bg-gray-700 p-3 rounded-lg border border-gray-600">
+                    <p class="font-bold text-gray-100">${kode}</p>
+                    <p class="text-sm text-gray-400">${keterangan}</p>
+                </div>
+            `).join('');
+
+            // 3. Dosen List (Sort by Name)
+            const dosenContainer = document.getElementById('dosen-list');
+            const sortedDosen = Object.entries(dosenData).sort(([, a], [, b]) => a.localeCompare(b));
+            
+            dosenContainer.innerHTML = sortedDosen.map(([kd, nama]) => `
+                <div class="bg-gray-700 p-3 rounded-lg border border-gray-600">
+                    <p class="font-bold text-gray-100">${nama}</p>
+                    <p class="text-sm text-gray-400">Kode Dosen: ${kd}</p>
+                </div>
+            `).join('');
+        }
+
+        // --- Initial Call ---
+
+        document.getElementById('semester-select').addEventListener('change', (e) => {
+            const selectedSemester = e.target.value;
+            renderSchedule(selectedSemester);
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Hide loading overlay and show content
+            document.getElementById('loading-overlay').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+            
+            // Render schedules for the 'all' tab (default view)
+            renderSchedule('all');
+        });
+    </script>
 </body>
 </html>
