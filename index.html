@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jadwal Kuliah & Ruangan</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --primary-color: #00bcd4;
+    --bg-dark: #121212;
+    --bg-light: #1e1e1e;
+    --text-light: #e0e0e0;
+    --text-dark: #121212;
+    --border-color: #333;
+    --table-radius: 10px;
+  }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-light);
+  }
+
+  /* Header */
+  header {
+    width: 100%;
+    background: var(--bg-light);
+    padding: 15px 25px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+    position: relative;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 22px;
+    color: var(--primary-color);
+    z-index: 2;
+  }
+  #clock {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 28px;
+    font-weight: bold;
+    color: var(--primary-color);
+    font-family: 'Courier New', monospace;
+    z-index: 1;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 220px;
+    height: calc(100vh - 63px);
+    background: var(--bg-light);
+    float: left;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+  }
+  .sidebar button {
+    padding: 18px;
+    border: none;
+    background: var(--bg-light);
+    color: var(--primary-color);
+    cursor: pointer;
+    font-size: 16px;
+    text-align: left;
+    transition: all 0.3s ease;
+    border-left: 5px solid transparent;
+  }
+  .sidebar button:hover {
+    background: #2a2a2a;
+    border-left: 5px solid var(--primary-color);
+  }
+
+  /* Content */
+  .content {
+    margin-left: 220px;
+    padding: 25px;
+    margin-top: 63px;
+  }
+  h2 {
+    color: var(--primary-color);
+    margin-bottom: 15px;
+  }
+
+  /* Tables */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 10px;
+    background: var(--bg-light);
+    border-radius: var(--table-radius);
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  }
+  th, td {
+    border: 1px solid var(--border-color);
+    padding: 12px;
+    text-align: center;
+  }
+  th {
+    background: var(--primary-color);
+    color: var(--text-dark);
+  }
+  td {
+    color: var(--text-light);
+  }
+
+  /* Inputs & Buttons */
+  input, button {
+    padding: 8px 12px;
+    margin: 6px 0;
+    border-radius: 6px;
+    border: none;
+    font-size: 14px;
+  }
+  input {
+    width: 100%;
+    max-width: 320px;
+  }
+  button {
+    background: var(--primary-color);
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: 0.3s;
+  }
+  button:hover {
+    background: #26c6da;
+  }
+
+  .hidden { display: none; }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .sidebar {
+      width: 100%;
+      height: auto;
+      flex-direction: row;
+      overflow-x: auto;
+    }
+    .sidebar button {
+      flex: 1;
+      font-size: 14px;
+      text-align: center;
+      border-left: none;
+      border-bottom: 3px solid transparent;
+    }
+    .sidebar button:hover { border-bottom: 3px solid var(--primary-color); }
+    .content { margin-left: 0; padding: 15px; }
+    table { font-size: 12px; }
+    header { flex-direction: column; align-items: flex-start; gap: 8px; position: relative; }
+    #clock { position: relative; left: 0; transform: none; font-size: 24px; margin-top: 5px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Jadwal Kuliah</h1>
+  <div id="clock">00:00:00</div>
+</header>
+
+<div class="sidebar">
+  <button onclick="showPage('hariIni')">Hari Ini</button>
+  <button onclick="showPage('jadwal')">Jadwal</button>
+  <button onclick="showPage('ruangan')">Ruangan</button>
+  <button onclick="showPage('upload')">Upload</button>
+</div>
+
+<div class="content">
+  <div id="hariIni" class="page">
+    <h2>Jadwal & Ruangan Hari Ini</h2>
+    <table id="todayTable">
+      <thead><tr><th>Jam</th><th>Mata Kuliah</th><th>Ruangan</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="jadwal" class="page hidden">
+    <h2>Semua Jadwal</h2>
+    <table id="jadwalTable">
+      <thead><tr><th>Mata Kuliah</th><th>Hari</th><th>Jam Mulai</th><th>Jam Selesai</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="ruangan" class="page hidden">
+    <h2>Semua Ruangan</h2>
+    <table id="ruanganTable">
+      <thead><tr><th>Ruangan</th><th>Hari</th><th>Jam Mulai</th><th>Jam Selesai</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="upload" class="page hidden">
+    <h2>Upload Jadwal dari Excel</h2>
+    <div>
+      <label>Materi & Jadwal: </label>
+      <input type="file" id="materiFile" accept=".xlsx,.xls">
+      <button onclick="uploadMateri()">Upload</button>
+    </div>
+    <div>
+      <label>Ruangan & Jadwal: </label>
+      <input type="file" id="ruanganFile" accept=".xlsx,.xls">
+      <button onclick="uploadRuangan()">Upload</button>
+    </div>
+    <div style="margin-top: 15px;">
+      <button style="background:red; color:white;" onclick="deleteAllData()">Hapus Semua Data</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- Navigation ---
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+// --- Firebase ---
+const firebaseConfig = {
+  apiKey: "AIzaSyBIaqsrhd1858u8_JGDLIbI7aIFLCn2O5E",
+  authDomain: "jadwal-451a8.firebaseapp.com",
+  projectId: "jadwal-451a8",
+  storageBucket: "jadwal-451a8.firebasestorage.app",
+  messagingSenderId: "787897743797",
+  appId: "1:787897743797:web:852d274bdc071c8ef041fc"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// --- Upload Excel ---
+function uploadMateri() {
+  const file = document.getElementById('materiFile').files[0];
+  if(!file) return alert('Pilih file Excel dulu');
+  const reader = new FileReader();
+  reader.onload = e => {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+    rows.forEach(row => {
+      db.ref('materi_jadwal').push({
+        mata_kuliah: row['Mata Kuliah'] || '',
+        hari: row['Hari'] || '',
+        jam_mulai: row['Jam Mulai'] || '',
+        jam_selesai: row['Jam Selesai'] || ''
+      });
+    });
+    alert('Materi & Jadwal berhasil di-upload!');
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function uploadRuangan() {
+  const file = document.getElementById('ruanganFile').files[0];
+  if(!file) return alert('Pilih file Excel dulu');
+  const reader = new FileReader();
+  reader.onload = e => {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+    rows.forEach(row => {
+      db.ref('ruangan_jadwal').push({
+        ruangan: row['Ruangan'] || '',
+        hari: row['Hari'] || '',
+        jam_mulai: row['Jam Mulai'] || '',
+        jam_selesai: row['Jam Selesai'] || ''
+      });
+    });
+    alert('Ruangan & Jadwal berhasil di-upload!');
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// --- Hapus Semua Data ---
+function deleteAllData() {
+  if(confirm("Apakah Anda yakin ingin menghapus semua data?")) {
+    db.ref('materi_jadwal').remove();
+    db.ref('ruangan_jadwal').remove();
+    alert("Semua data berhasil dihapus!");
+  }
+}
+
+// --- Display Jadwal Hari Ini ---
+function updateTodayTable() {
+  const today = new Date().toLocaleDateString('id-ID', { weekday: 'long' });
+  const tbody = document.querySelector('#todayTable tbody');
+  tbody.innerHTML = '';
+  const jadwalData = {};
+  db.ref('materi_jadwal').once('value').then(snapshot => {
+    snapshot.forEach(child => {
+      const data = child.val();
+      if(data.hari.toLowerCase() === today.toLowerCase()) {
+        jadwalData[data.mata_kuliah] = { jam_mulai: data.jam_mulai, jam_selesai: data.jam_selesai };
+      }
+    });
+    db.ref('ruangan_jadwal').once('value').then(snapshot => {
+      snapshot.forEach(child => {
+        const data = child.val();
+        for(const mata in jadwalData) {
+          if(data.hari.toLowerCase() === today.toLowerCase()) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${jadwalData[mata].jam_mulai} - ${jadwalData[mata].jam_selesai}</td><td>${mata}</td><td>${data.ruangan}</td>`;
+            tbody.appendChild(tr);
+          }
+        }
+      });
+    });
+  });
+}
+
+// Listen for updates
+db.ref('materi_jadwal').on('value', updateTodayTable);
+db.ref('ruangan_jadwal').on('value', updateTodayTable);
+
+// --- Clock ---
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+</script>
+
+</body>
+</html>
